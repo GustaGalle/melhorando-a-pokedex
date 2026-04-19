@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./pokedex.css";
 import { getPokemons, type PokemonListItem } from "../services/api";
+import PokemonCard from "./PokemonCard";
 
 export default function Pokedex() {
   const [search, setSearch] = useState("");
@@ -107,9 +108,7 @@ export default function Pokedex() {
       {!isLoading && filteredPokemons.length > 0 && (
         <ul className="pokedex-list">
           {filteredPokemons.map((pokemon) => (
-            <li key={pokemon.name} className="pokedex-list-item">
-              {pokemon.name}
-            </li>
+            <PokemonCard key={pokemon.name} pokemon={pokemon} />
           ))}
         </ul>
       )}
