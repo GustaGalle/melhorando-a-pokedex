@@ -44,6 +44,11 @@
   border-radius: 4px;
 }
 
+.pokedex-empty {
+  margin-top: 10px;
+  color: #666;
+}
+
 .pokedex-card {
   margin-top: 20px;
   background-color: #f8f8f8;
@@ -52,12 +57,21 @@
   text-align: left;
 }
 
-.pokedex-name {
-  text-transform: capitalize;
-  margin-bottom: 10px;
+.pokedex-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
 }
 
-.pokedex-image {
-  display: block;
-  margin: 0 auto 10px;
+.pokedex-list-item {
+  text-transform: capitalize;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.pokedex-trigger {
+  height: 1px;
 }

@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./pokedex.css";
-import {
-  fetchInitialPokemon,
-  fetchPokemonByName,
-  type Pokemon,
-} from "../services/api";
+import { getPokemons, type PokemonListItem } from "../services/api";
 
 export default function Pokedex() {
-  const [nome, setNome] = useState("");
-  const [carregando, setCarregando] = useState(false);
+  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [erroInicial, setErroInicial] = useState("");
-
-  const [pokemon, setPokemon] = useState<Pokemon | null>(null);
-  const [erro, setErro] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [pokemons, setPokemons] = useState<PokemonListItem[]>([]);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
+  const isLoadingMoreRef = useRef(false);
 
   useEffect(() => {
     const carregarPokemonInicial = async () => {
@@ -21,8 +20,10 @@ export default function Pokedex() {
       setErroInicial("");
 
       try {
-        const pokemonInicial = await fetchInitialPokemon();
-        setPokemon(pokemonInicial);
+        const response = await getPokemons(0);
+        setPokemons(response.results);
+        setOffset(response.results.length);
+        setHasMore(Boolean(response.next));
       } catch {
         setErroInicial("Falha ao carregar Pokemons. Verifique sua conexao.");
       } finally {
@@ -33,22 +34,55 @@ export default function Pokedex() {
     void carregarPokemonInicial();
   }, []);
 
-  const buscarPokemon = async () => {
-    if (!nome.trim()) return;
-
-    setCarregando(true);
-    setErro("");
-    setPokemon(null);
-
-    try {
-      const dados = await fetchPokemonByName(nome);
-      setPokemon(dados);
-    } catch {
-      setErro("Pokemon nao encontrado 😢");
-    } finally {
-      setCarregando(false);
+  const loadMorePokemons = useCallback(async () => {
+    if (isLoading || isLoadingMoreRef.current || !hasMore || erroInicial) {
+      return;
     }
-  };
+
+    isLoadingMoreRef.current = true;
+    setIsLoadingMore(true);
+    try {
+      const response = await getPokemons(offset);
+      setPokemons((prev) => [...prev, ...response.results]);
+      setOffset((prevOffset) => prevOffset + response.results.length);
+      setHasMore(Boolean(response.next));
+    } catch {
+      // Keeps existing list visible if pagination fails.
+    } finally {
+      isLoadingMoreRef.current = false;
+      setIsLoadingMore(false);
+    }
+  }, [erroInicial, hasMore, isLoading, offset]);
+
+  useEffect(() => {
+    if (!loadMoreTriggerRef.current) return;
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMorePokemons();
+        }
+      },
+      { threshold: 0.2 },
+    );
+
+    observerRef.current.observe(loadMoreTriggerRef.current);
+
+    return () => observerRef.current?.disconnect();
+  }, [loadMorePokemons]);
+
+  const filteredPokemons = useMemo(() => {
+    const termo = search.trim().toLowerCase();
+    if (!termo) return pokemons;
+    return pokemons.filter((pokemon) => pokemon.name.includes(termo));
+  }, [pokemons, search]);
+
+  const mensagemListaVazia =
+    !isLoading && filteredPokemons.length === 0
+      ? search.trim()
+        ? `Nenhum Pokemon encontrado para '${search.trim()}'.`
+        : "Nenhum Pokemon para exibir no momento."
+      : "";
 
   return (
     <div className="pokedex-container">
@@ -57,43 +91,35 @@ export default function Pokedex() {
       <input
         className="pokedex-input"
         type="text"
-        placeholder="Digite o nome do Pokémon"
-        value={nome}
-        onChange={(e) => setNome(e.target.value)}
+        placeholder="Busque por nome"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
       />
-
-      <button className="pokedex-button" onClick={buscarPokemon}>
-        Buscar
-      </button>
 
       {isLoading && (
         <p className="pokedex-loading">Carregando Pokemons...</p>
       )}
       {!isLoading && erroInicial && <p className="pokedex-error">{erroInicial}</p>}
-      {carregando && <p className="pokedex-loading">Carregando...</p>}
-      {erro && <p className="pokedex-error">{erro}</p>}
+      {!erroInicial && mensagemListaVazia && (
+        <p className="pokedex-empty">{mensagemListaVazia}</p>
+      )}
 
-      {!isLoading && pokemon && (
-        <div className="pokedex-card">
-          <h3 className="pokedex-name">{pokemon.name}</h3>
-          {pokemon.sprites.front_default && (
-            <img
-              src={pokemon.sprites.front_default}
-              alt={pokemon.name}
-              className="pokedex-image"
-            />
-          )}
-          <p>
-            <strong>Altura:</strong> {pokemon.height * 10} cm
-          </p>
-          <p>
-            <strong>Peso:</strong> {pokemon.weight / 10} kg
-          </p>
-          <p>
-            <strong>Tipos:</strong>{" "}
-            {pokemon.types.map((t) => t.type.name).join(" / ")}
-          </p>
-        </div>
+      {!isLoading && filteredPokemons.length > 0 && (
+        <ul className="pokedex-list">
+          {filteredPokemons.map((pokemon) => (
+            <li key={pokemon.name} className="pokedex-list-item">
+              {pokemon.name}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!isLoading && hasMore && !search.trim() && !erroInicial && (
+        <div ref={loadMoreTriggerRef} className="pokedex-trigger" />
+      )}
+
+      {!isLoading && isLoadingMore && (
+        <p className="pokedex-loading">Carregando mais Pokemons...</p>
       )}
     </div>
   );
