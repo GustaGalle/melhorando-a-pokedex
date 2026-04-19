@@ -8,12 +8,12 @@ import {
 
 export default function Pokedex() {
   const [nome, setNome] = useState("");
+  const [termoBuscado, setTermoBuscado] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [erroInicial, setErroInicial] = useState("");
 
   const [pokemon, setPokemon] = useState<Pokemon | null>(null);
-  const [erro, setErro] = useState("");
 
   useEffect(() => {
     const carregarPokemonInicial = async () => {
@@ -36,19 +36,27 @@ export default function Pokedex() {
   const buscarPokemon = async () => {
     if (!nome.trim()) return;
 
+    const termo = nome.trim();
+    setTermoBuscado(termo);
     setCarregando(true);
-    setErro("");
     setPokemon(null);
 
     try {
-      const dados = await fetchPokemonByName(nome);
+      const dados = await fetchPokemonByName(termo);
       setPokemon(dados);
     } catch {
-      setErro("Pokemon nao encontrado 😢");
+      // Empty state message handles "not found" feedback.
     } finally {
       setCarregando(false);
     }
   };
+
+  const mensagemListaVazia =
+    !isLoading && !carregando && !pokemon
+      ? termoBuscado
+        ? `Nenhum Pokemon encontrado para '${termoBuscado}'.`
+        : "Nenhum Pokemon para exibir no momento."
+      : "";
 
   return (
     <div className="pokedex-container">
@@ -71,7 +79,9 @@ export default function Pokedex() {
       )}
       {!isLoading && erroInicial && <p className="pokedex-error">{erroInicial}</p>}
       {carregando && <p className="pokedex-loading">Carregando...</p>}
-      {erro && <p className="pokedex-error">{erro}</p>}
+      {!erroInicial && mensagemListaVazia && (
+        <p className="pokedex-empty">{mensagemListaVazia}</p>
+      )}
 
       {!isLoading && pokemon && (
         <div className="pokedex-card">
